@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { DUMMY_LINKS } from "@/data/links";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,24 +11,45 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const linkSchema = z.object({
+  title: z
+    .string()
+    .min(1, { message: "링크 제목을 입력해주세요." })
+    .max(50, { message: "제목은 50자 이내로 입력해주세요." }),
+  url: z
+    .string()
+    .min(1, { message: "URL을 입력해주세요." })
+    .url({ message: "유효한 URL 형식이 아닙니다. (예: https://example.com)" }),
+});
+
 export default function Page() {
   const [links, setLinks] = useState(DUMMY_LINKS);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newLink, setNewLink] = useState({ title: "", url: "" });
 
-  const handleAddLink = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLink.title || !newLink.url) return;
+  const form = useForm<z.infer<typeof linkSchema>>({
+    resolver: zodResolver(linkSchema),
+    defaultValues: {
+      title: "",
+      url: "",
+    },
+  });
 
+  const handleOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      form.reset();
+    }
+  };
+
+  const onSubmit = (values: z.infer<typeof linkSchema>) => {
     const addedLink = {
       id: Date.now().toString(),
-      title: newLink.title,
-      url: newLink.url,
-      // Default placeholder if Icon is missing
+      title: values.title.trim(),
+      url: values.url.trim(),
     };
 
     setLinks([...links, addedLink]);
-    setNewLink({ title: "", url: "" });
+    form.reset();
     setIsDialogOpen(false);
   };
 
@@ -90,7 +114,7 @@ export default function Page() {
       </div>
 
       {/* Add Link Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
         <DialogTrigger 
           render={<Button className="fixed bottom-8 right-8 h-14 w-14 rounded-full shadow-2xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white border-0 hover:scale-105 transition-all duration-300 z-50 flex items-center justify-center p-0" aria-label="Add Link" />}
         >
@@ -100,28 +124,32 @@ export default function Page() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">새 링크 추가</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleAddLink} className="space-y-4 mt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="title" className="text-slate-700">링크 제목</Label>
               <Input 
                 id="title" 
                 placeholder="예: 내 포트폴리오" 
-                value={newLink.title}
-                onChange={(e) => setNewLink({...newLink, title: e.target.value})}
-                className="rounded-xl"
-                autoFocus
+                className={`rounded-xl ${form.formState.errors.title ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                autoFocus 
+                {...form.register("title")} 
               />
+              {form.formState.errors.title && (
+                <p className="px-1 text-sm font-medium text-red-500">{form.formState.errors.title.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="url" className="text-slate-700">URL 주소</Label>
               <Input 
                 id="url" 
                 placeholder="https://..." 
-                type="url"
-                value={newLink.url}
-                onChange={(e) => setNewLink({...newLink, url: e.target.value})}
-                className="rounded-xl"
+                type="url" 
+                className={`rounded-xl ${form.formState.errors.url ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                {...form.register("url")} 
               />
+              {form.formState.errors.url && (
+                <p className="px-1 text-sm font-medium text-red-500">{form.formState.errors.url.message}</p>
+              )}
             </div>
             <Button type="submit" className="w-full rounded-xl bg-slate-900 hover:bg-slate-800 text-white mt-6 h-12">
               추가하기
